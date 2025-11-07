@@ -1,15 +1,6 @@
 
 
 
-"""
-main.py
-Script principal para EDA del proyecto "bank marketing" + "customer details".
-Genera:
- - datos limpios en data/processed/
- - gráficos en outputs/figures/
- - resumen descriptivo en outputs/tables/
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,6 +9,15 @@ import seaborn as sns
 #Carga de datos CSV y Excel
 def load_data(bank_path: str, customers_path: str):
     bank = pd.read_csv(bank_path)
+# >>> DEBUG fecha cruda (apenas cargar CSV)
+if 'date' in bank.columns:
+    print("\n[DEBUG] 'date' cruda (CSV) ANTES de limpiar:")
+    print("  dtype:", bank['date'].dtype)
+    print("  n_nulos:", bank['date'].isna().sum())
+    print("  n_blancos:", (bank['date'].astype(str).str.strip() == '').sum())
+    print("  muestra_10:", bank['date'].astype(str).head(10).tolist())
+else:
+    print("\n[DEBUG] No existe columna 'date' en el CSV")
 
     xls = pd.ExcelFile(customers_path)
     sheet_names = xls.sheet_names
@@ -37,6 +37,38 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
         if c in df.columns:
             df = df.drop(columns=c)
 
+    if 'date' in df.columns:
+        raw = df['date'].astype(str).str.strip()
+        print("\n[DEBUG] 'date' en clean_bank() ANTES de parsear:")
+        print("  n_nulos:", df['date'].isna().sum())
+        print("  n_blancos:", (raw == '').sum())
+        print("  muestra_no_vacios:", raw[raw != ''].head(5).tolist())
+
+        # Trata blancos como NaN antes del parseo
+        df['date'] = raw.replace('', pd.NA)
+
+    # >>> aquí ya haces el parseo robusto, o lo saltas si está vacía:
+    if 'date' in df.columns and df['date'].notna().sum() > 0:
+        # PRUEBAS DE FORMATO (elige una o deja el fallback)
+        parsed = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+        if parsed.notna().mean() < 0.5:
+            parsed = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
+        if parsed.notna().sum() == 0:
+            parsed = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
+
+        df['date'] = parsed
+        if df['date'].notna().sum() > 0:
+            df['contact_year'] = df['date'].dt.year
+            df['contact_month'] = df['date'].dt.month
+    else:
+        # Si está vacía, asegúrate de no dejar derivadas colgando
+        for c in ['contact_year', 'contact_month']:
+            if c in df.columns:
+                df = df.drop(columns=c)
+
+    # ... resto de limpieza
+    return df   
+
     # Normalizar texto.
     for c in ['job', 'marital', 'education', 'contact', 'poutcome', 'y']:
         if c in df.columns and df[c].dtype == 'object':
@@ -49,7 +81,7 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
     # Conversión de fechas.
     if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
         df['contact_year'] = df['date'].dt.year
         df['contact_month'] = df['date'].dt.month
 
@@ -65,7 +97,7 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-#Lilmpieza del dataset de clientes. 
+#Limpieza del dataset de clientes. 
 def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
     df = customers.copy()
     if 'Dt_Customer' in df.columns:
