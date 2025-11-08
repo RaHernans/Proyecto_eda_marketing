@@ -101,6 +101,70 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import re
+import unicodedata
+
+SPANISH_MONTHS = {
+    "enero": "01",
+    "febrero": "02",
+    "marzo": "03",
+    "abril": "04",
+    "mayo": "05",
+    "junio": "06",
+    "julio": "07",
+    "agosto": "08",
+    "septiembre": "09",  # a veces aparece "setiembre"
+    "setiembre": "09",
+    "octubre": "10",
+    "noviembre": "11",
+    "diciembre": "12",
+}
+
+def _strip_accents(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", text)
+        if unicodedata.category(ch) != "Mn"
+    )
+
+def parse_spanish_month_dates(series: pd.Series) -> pd.Series:
+    """
+    Convierte fechas tipo '2-agosto-2019' a datetime.
+    - Normaliza a minúsculas
+    - Quita acentos
+    - Reemplaza nombre de mes por número
+    - Parsea con formato '%d-%m-%Y'
+    """
+    s = series.astype(str).str.strip().str.lower().apply(_strip_accents)
+
+    # detecta si hay palabras de meses en español
+    month_regex = r"(" + "|".join(SPANISH_MONTHS.keys()) + r")"
+    has_spanish_month = s.str.contains(month_regex, na=False)
+
+    if not has_spanish_month.any():
+        # no hay meses en español -> devolvemos NaT (que luego tu bloque robusto podrá cubrir)
+        return pd.to_datetime(series, errors="coerce")
+
+    def replace_month(word_date: str) -> str:
+        # esperado: '2-agosto-2019' (separado por '-')
+        parts = word_date.split("-")
+        if len(parts) != 3:
+            return word_date  # lo dejamos intacto y fallará a NaT en el parseo
+        d, m, y = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        m_num = SPANISH_MONTHS.get(m, None)
+        if m_num is None:
+            return word_date
+        # normaliza día a dos dígitos si procede
+        if d.isdigit():
+            d = d.zfill(2)
+        return f"{d}-{m_num}-{y}"
+
+    # solo transformamos las filas que contienen mes español
+    transformed = s.where(~has_spanish_month, s[has_spanish_month].apply(replace_month))
+    # ahora parseamos con formato fijo
+    parsed = pd.to_datetime(transformed, format="%d-%m-%Y", errors="coerce")
+    return parsed
 
 
 # -------------------------------
