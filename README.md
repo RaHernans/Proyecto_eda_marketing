@@ -95,35 +95,4 @@ Raquel Hernández Santos
 Curso Data Analytics – The Power
 Módulo Python for Data — Proyecto EDA
 
-    # 2.4 Manejo robusto de 'date' (meses en español, sin warnings)
-    if 'date' in df.columns:
-        raw = df['date']
-
-        # Ignoramos UserWarning solo dentro de este bloque
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-
-            parsed = parse_spanish_month_dates(raw)
-
-            # Si aún queda poco parseado, probamos formatos numéricos habituales
-            if parsed.notna().mean() < 0.90:
-                candidates = ["%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"]
-                best = parsed
-                for fmt in candidates:
-                    tmp = pd.to_datetime(raw, format=fmt, errors='coerce')
-                    if tmp.notna().mean() > best.notna().mean():
-                        best = tmp
-                parsed = best
-
-        df['date'] = parsed
-
-        # Derivar solo si hay fechas válidas
-        if df['date'].notna().sum() > 0:
-            df['contact_year'] = df['date'].dt.year
-            df['contact_month'] = df['date'].dt.month
-        else:
-            for c in ('contact_year', 'contact_month'):
-                if c in df.columns:
-                    df.drop(columns=c, inplace=True)
-
-
+  
