@@ -1,23 +1,95 @@
 
-
-
+import re
+import unicodedata
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import warnings
 
-#Carga de datos CSV y Excel
+# =========================
+# Utilidades y helpers
+# =========================
+
+def ensure_openpyxl() -> bool:
+    """Comprueba que openpyxl está disponible para leer .xlsx."""
+    try:
+        import openpyxl  # noqa: F401
+        return True
+    except Exception as e:
+        print("❌ Falta 'openpyxl' para leer Excel (.xlsx). Instálalo con:")
+        print("   pip install openpyxl")
+        print("Detalle:", repr(e))
+        return False
+
+
+SPANISH_MONTHS = {
+    "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+    "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+    "septiembre": "09", "setiembre": "09", "octubre": "10",
+    "noviembre": "11", "diciembre": "12",
+}
+
+def _strip_accents(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", text)
+        if unicodedata.category(ch) != "Mn"
+    )
+
+def parse_spanish_month_dates(series: pd.Series) -> pd.Series:
+    """
+    Convierte fechas tipo '2-agosto-2019' o '14-septiembre-2016' a datetime.
+    - Minúsculas, sin acentos
+    - Acepta separadores '-', '/' o espacio
+    - Reemplaza el mes en palabra por su número y parsea con '%d-%m-%Y'
+    """
+    s = series.astype(str).str.strip().str.lower().apply(_strip_accents)
+    # patrón: día(1-2 díg) separador palabra separador año(4 díg)
+    pattern = re.compile(r'^(\d{1,2})[-/\s]([a-zñ]+)[-/\s](\d{4})$')
+
+    def convert_one(x: str) -> str:
+        m = pattern.match(x)
+        if not m:
+            return x
+        d, mon, y = m.groups()
+        mon_num = SPANISH_MONTHS.get(mon)
+        if not mon_num:
+            return x
+        d = d.zfill(2)
+        return f"{d}-{mon_num}-{y}"
+
+    # Solo transformamos filas con nombre de mes en español
+    month_words = r'(' + '|'.join(SPANISH_MONTHS.keys()) + r')'
+    has_spanish = s.str.contains(month_words, na=False)
+    transformed = s.where(~has_spanish, s[has_spanish].apply(convert_one))
+
+    # parseo sin inferir: formato fijo
+    parsed = pd.to_datetime(transformed, format='%d-%m-%Y', errors='coerce')
+    return parsed
+
+
+# =========================
+# 1) Carga de datos
+# =========================
+
 def load_data(bank_path: str, customers_path: str):
     bank = pd.read_csv(bank_path)
-# >>> DEBUG fecha cruda (apenas cargar CSV)
-if 'date' in bank.columns:
-    print("\n[DEBUG] 'date' cruda (CSV) ANTES de limpiar:")
-    print("  dtype:", bank['date'].dtype)
-    print("  n_nulos:", bank['date'].isna().sum())
-    print("  n_blancos:", (bank['date'].astype(str).str.strip() == '').sum())
-    print("  muestra_10:", bank['date'].astype(str).head(10).tolist())
-else:
-    print("\n[DEBUG] No existe columna 'date' en el CSV")
+
+    # DEBUG: muestra rápida de 'date' cruda
+    if 'date' in bank.columns:
+        print("\n[DEBUG] 'date' cruda (CSV) ANTES de limpiar:")
+        print("  dtype:", bank['date'].dtype)
+        print("  n_nulos:", bank['date'].isna().sum())
+        print("  n_blancos:", (bank['date'].astype(str).str.strip() == '').sum())
+        print("  muestra_10:", bank['date'].astype(str).head(10).tolist())
+    else:
+        print("\n[DEBUG] No existe columna 'date' en el CSV")
+
+    # Excel (clientes)
+    if not ensure_openpyxl():
+        raise SystemExit(1)
 
     xls = pd.ExcelFile(customers_path)
     sheet_names = xls.sheet_names
@@ -28,64 +100,63 @@ else:
     )
     return bank, customers, sheet_names
 
-#Limpieza del dataset de campañas.
+
+# =========================
+# 2) Limpieza de campañas
+# =========================
+
 def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
+    """Limpieza del dataset bank-additional.csv."""
     df = bank.copy()
 
-    # Eliminar columna índice creada al exportar el archivo CSV.
-    for c in ["Unnamed: 0"]:
-        if c in df.columns:
-            df = df.drop(columns=c)
+    # 2.1 Eliminar columna índice accidental
+    if "Unnamed: 0" in df.columns:
+        df.drop(columns="Unnamed: 0", inplace=True)
 
-    if 'date' in df.columns:
-        raw = df['date'].astype(str).str.strip()
-        print("\n[DEBUG] 'date' en clean_bank() ANTES de parsear:")
-        print("  n_nulos:", df['date'].isna().sum())
-        print("  n_blancos:", (raw == '').sum())
-        print("  muestra_no_vacios:", raw[raw != ''].head(5).tolist())
-
-        # Trata blancos como NaN antes del parseo
-        df['date'] = raw.replace('', pd.NA)
-
-    # >>> aquí ya haces el parseo robusto, o lo saltas si está vacía:
-    if 'date' in df.columns and df['date'].notna().sum() > 0:
-        # PRUEBAS DE FORMATO (elige una o deja el fallback)
-        parsed = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
-        if parsed.notna().mean() < 0.5:
-            parsed = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
-        if parsed.notna().sum() == 0:
-            parsed = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
-
-        df['date'] = parsed
-        if df['date'].notna().sum() > 0:
-            df['contact_year'] = df['date'].dt.year
-            df['contact_month'] = df['date'].dt.month
-    else:
-        # Si está vacía, asegúrate de no dejar derivadas colgando
-        for c in ['contact_year', 'contact_month']:
-            if c in df.columns:
-                df = df.drop(columns=c)
-
-    # ... resto de limpieza
-    return df   
-
-    # Normalizar texto.
+    # 2.2 Normalizar texto en categóricas
     for c in ['job', 'marital', 'education', 'contact', 'poutcome', 'y']:
         if c in df.columns and df[c].dtype == 'object':
             df[c] = df[c].astype(str).str.strip().str.lower()
 
-    # Conversión de columnas binarias al tipo Int64.
+    # 2.3 Binarios a Int64 (preserva NaN)
     for c in ['default', 'housing', 'loan']:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors='coerce').astype('Int64')
 
-    # Conversión de fechas.
+    # 2.4 Manejo robusto de 'date' (meses en español, sin warnings)
     if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
-        df['contact_year'] = df['date'].dt.year
-        df['contact_month'] = df['date'].dt.month
+        raw = df['date']
 
-    # Transformación de columnas numéricas.
+        # Ignoramos UserWarning solo dentro de este bloque
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+
+            parsed = parse_spanish_month_dates(raw)
+
+            # Si aún queda poco parseado, probamos formatos numéricos habituales
+            if parsed.notna().mean() < 0.90:
+                candidates = ["%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"]
+                best = parsed
+                for fmt in candidates:
+                    tmp = pd.to_datetime(raw, format=fmt, errors='coerce')
+                    if tmp.notna().mean() > best.notna().mean():
+                        best = tmp
+                parsed = best
+
+        df['date'] = parsed
+
+        # Derivar solo si hay fechas válidas
+        if df['date'].notna().sum() > 0:
+            df['contact_year'] = df['date'].dt.year
+            df['contact_month'] = df['date'].dt.month
+        else:
+            for c in ('contact_year', 'contact_month'):
+                if c in df.columns:
+                    df.drop(columns=c, inplace=True)
+
+
+
+    # 2.5 Asegurar numéricos (si existen)
     numeric_candidates = [
         'age', 'duration', 'campaign', 'pdays', 'previous',
         'emp.var.rate', 'cons.price.idx', 'cons.conf.idx',
@@ -97,9 +168,14 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-#Limpieza del dataset de clientes. 
+
+# =========================
+# 3) Limpieza de clientes
+# =========================
+
 def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
     df = customers.copy()
+
     if 'Dt_Customer' in df.columns:
         df['Dt_Customer'] = pd.to_datetime(df['Dt_Customer'], errors='coerce')
 
@@ -109,36 +185,55 @@ def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-#ntegración de los datasets a traves el ID.
+
+# =========================
+# 4) Integración (left join)
+# =========================
+
 def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
-    """Une bank y customers por id_ ↔ ID."""
+    """Une bank y customers por id_ ↔ ID (left join)."""
     if 'id_' in bank.columns and 'ID' in customers.columns:
         merged = bank.merge(customers, left_on='id_', right_on='ID', how='left')
     else:
         merged = bank.copy()
     return merged
 
-#Análisis descriptivo 
 
-#Resumen estadítico
+# =========================
+# 5) (Opcional) columnas casi vacías
+# =========================
+
+def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.98) -> pd.DataFrame:
+    to_drop = [c for c in df.columns if df[c].isna().mean() >= thresh]
+    if to_drop:
+        print(f"⚠️ Eliminando columnas casi vacías (≥{int(thresh*100)}% nulos): {to_drop}")
+        df = df.drop(columns=to_drop)
+    return df
+
+
+# =========================
+# 6) Análisis descriptivo
+# =========================
+
 def descriptive_analysis(df: pd.DataFrame) -> dict:
     summary = {}
     summary['shape'] = df.shape
     summary['nulls'] = df.isna().sum().sort_values(ascending=False)
+
     num_df = df.select_dtypes(include=['number'])
     summary['describe_num'] = num_df.describe().T
 
     if 'y' in df.columns:
         summary['target_balance'] = df['y'].value_counts(normalize=True).rename('Proporción')
 
-    if num_df.shape[1] >= 2:
-        summary['corr'] = num_df.corr(numeric_only=True)
-    else:
-        summary['corr'] = pd.DataFrame()
-
+    summary['corr'] = num_df.corr(numeric_only=True) if num_df.shape[1] >= 2 else pd.DataFrame()
     return summary
 
-#Visualizaciones con matplotlib y seaborn.
+
+# =========================
+# 7) Visualizaciones
+# =========================
+
 def quick_plots(df: pd.DataFrame):
     # Histograma de edad
     if 'age' in df.columns:
@@ -173,7 +268,11 @@ def quick_plots(df: pd.DataFrame):
         plt.title("Matriz de correlación (variables numéricas)")
         plt.tight_layout()
 
-#Ejecución: 
+
+# =========================
+# 8) Ejecución
+# =========================
+
 def main():
     bank_path = "data/raw/bank-additional.csv"
     customers_path = "data/raw/customer-details.xlsx"
@@ -190,6 +289,9 @@ def main():
     # Unir
     df = merge_data(bank, customers)
 
+    # (Opcional) eliminar columnas casi vacías
+    df = drop_mostly_nulls(df, thresh=0.98)
+
     # Guardar limpio
     output = "data/processed/marketing_merged_clean.csv"
     df.to_csv(output, index=False)
@@ -205,11 +307,15 @@ def main():
     # Visualizaciones
     quick_plots(df)
 
-    # Mostrar gráficosS
+    # Mostrar gráficos (descomenta si no aparecen en tu entorno)
     # plt.show()
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
 
