@@ -307,8 +307,8 @@ def main():
     # Visualizaciones
     quick_plots(df)
 
-    # Mostrar gráficos (descomenta si no aparecen en tu entorno)
-    # plt.show()
+    # Mostrar gráficos 
+    plt.show()
 
 
 if __name__ == "__main__":
