@@ -109,13 +109,13 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
     if 'date' in df.columns:
         raw = df['date']
 
-        # Ignoramos UserWarning solo dentro de este bloque
+        # Ignorar UserWarning solo dentro de este bloque
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
 
             parsed = parse_spanish_month_dates(raw)
 
-            # Si aún queda poco parseado, probamos formatos numéricos habituales
+            # Si aún queda poco parseado, probar formatos numéricos habituales
             if parsed.notna().mean() < 0.90:
                 candidates = ["%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"]
                 best = parsed
@@ -127,7 +127,7 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
         df['date'] = parsed
 
-        # Derivar solo si hay fechas válidas
+        # Se deriva solo si hay fechas válidas
         if df['date'].notna().sum() > 0:
             df['contact_year'] = df['date'].dt.year
             df['contact_month'] = df['date'].dt.month
@@ -182,7 +182,7 @@ def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
 
 
 # =========================
-# 5) (Opcional) columnas casi vacías
+# 5) Eliminar columnas casi vacías
 # =========================
 
 def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.98) -> pd.DataFrame:
@@ -271,7 +271,7 @@ def main():
     # Unir
     df = merge_data(bank, customers)
 
-    # (Opcional) eliminar columnas casi vacías
+    # Eliminar columnas casi vacías 
     df = drop_mostly_nulls(df, thresh=0.98)
 
     # Guardar limpio
