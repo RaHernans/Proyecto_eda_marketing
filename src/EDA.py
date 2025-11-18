@@ -1,3 +1,4 @@
+##Importación de librerías.
 
 import re
 import unicodedata
@@ -11,25 +12,14 @@ import warnings
 # Utilidades y helpers
 # =========================
 
-def ensure_openpyxl() -> bool:
-    """Comprueba que openpyxl está disponible para leer .xlsx."""
-    try:
-        import openpyxl  # noqa: F401
-        return True
-    except Exception as e:
-        print("❌ Falta 'openpyxl' para leer Excel (.xlsx). Instálalo con:")
-        print("   pip install openpyxl")
-        print("Detalle:", repr(e))
-        return False
-
-
+   # Conversión de fechas: eliminar acentos, separar día, mes, año, pasar texto mes a número, formato estandar.
 SPANISH_MONTHS = {
     "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
     "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
     "septiembre": "09", "setiembre": "09", "octubre": "10",
     "noviembre": "11", "diciembre": "12",
 }
-
+ 
 def _strip_accents(text: str) -> str:
     if not isinstance(text, str):
         return text
@@ -39,14 +29,9 @@ def _strip_accents(text: str) -> str:
     )
 
 def parse_spanish_month_dates(series: pd.Series) -> pd.Series:
-    """
-    Convierte fechas tipo '2-agosto-2019' o '14-septiembre-2016' a datetime.
-    - Minúsculas, sin acentos
-    - Acepta separadores '-', '/' o espacio
-    - Reemplaza el mes en palabra por su número y parsea con '%d-%m-%Y'
-    """
+    
     s = series.astype(str).str.strip().str.lower().apply(_strip_accents)
-    # patrón: día(1-2 díg) separador palabra separador año(4 díg)
+   
     pattern = re.compile(r'^(\d{1,2})[-/\s]([a-zñ]+)[-/\s](\d{4})$')
 
     def convert_one(x: str) -> str:
@@ -60,12 +45,12 @@ def parse_spanish_month_dates(series: pd.Series) -> pd.Series:
         d = d.zfill(2)
         return f"{d}-{mon_num}-{y}"
 
-    # Solo transformamos filas con nombre de mes en español
+   
     month_words = r'(' + '|'.join(SPANISH_MONTHS.keys()) + r')'
     has_spanish = s.str.contains(month_words, na=False)
     transformed = s.where(~has_spanish, s[has_spanish].apply(convert_one))
 
-    # parseo sin inferir: formato fijo
+  
     parsed = pd.to_datetime(transformed, format='%d-%m-%Y', errors='coerce')
     return parsed
 
@@ -87,9 +72,6 @@ def load_data(bank_path: str, customers_path: str):
     else:
         print("\n[DEBUG] No existe columna 'date' en el CSV")
 
-    # Excel (clientes)
-    if not ensure_openpyxl():
-        raise SystemExit(1)
 
     xls = pd.ExcelFile(customers_path)
     sheet_names = xls.sheet_names
