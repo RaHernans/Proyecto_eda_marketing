@@ -83,29 +83,31 @@ def load_data(bank_path: str, customers_path: str):
     return bank, customers, sheet_names
 
 
-# =========================
-# 2) Limpieza de campañas
-# =========================
+# =====================================
+# 2) Limpieza y transformación de datos
+# =====================================
+
+    # 2.1 Limpieza del dataset de campañas 
 
 def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
     """Limpieza del dataset bank-additional.csv."""
     df = bank.copy()
 
-    # 2.1 Eliminar columna índice accidental
+    # 1 Eliminar columna índice accidental
     if "Unnamed: 0" in df.columns:
         df.drop(columns="Unnamed: 0", inplace=True)
 
-    # 2.2 Normalizar texto en categóricas
+    # 2 Normalizar texto en categóricas
     for c in ['job', 'marital', 'education', 'contact', 'poutcome', 'y']:
         if c in df.columns and df[c].dtype == 'object':
             df[c] = df[c].astype(str).str.strip().str.lower()
 
-    # 2.3 Binarios a Int64 (preserva NaN)
+    # 3 Binarios a Int64 (preserva NaN)
     for c in ['default', 'housing', 'loan']:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors='coerce').astype('Int64')
 
-    # 2.4 Manejo robusto de 'date' (meses en español, sin warnings)
+    # 4 Manejo robusto de 'date' (meses en español, sin warnings)
     if 'date' in df.columns:
         raw = df['date']
 
@@ -138,7 +140,7 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
 
 
-    # 2.5 Asegurar numéricos (si existen)
+    # 5 Asegurar numéricos (si existen)
     numeric_candidates = [
         'age', 'duration', 'campaign', 'pdays', 'previous',
         'emp.var.rate', 'cons.price.idx', 'cons.conf.idx',
@@ -150,10 +152,8 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+   # 2.2 Limpieza del dataset de clientes
 
-# =========================
-# 3) Limpieza de clientes
-# =========================
 
 def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
     df = customers.copy()
@@ -169,7 +169,7 @@ def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
 
 
 # =========================
-# 4) Integración (left join)
+# 3) Integración (left join)
 # =========================
 
 def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
@@ -182,7 +182,7 @@ def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
 
 
 # =========================
-# 5) Eliminar columnas casi vacías
+# 4) Eliminar columnas casi vacías
 # =========================
 
 def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.98) -> pd.DataFrame:
@@ -194,7 +194,7 @@ def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.98) -> pd.DataFrame:
 
 
 # =========================
-# 6) Análisis descriptivo
+# 5) Análisis descriptivo
 # =========================
 
 def descriptive_analysis(df: pd.DataFrame) -> dict:
@@ -213,7 +213,7 @@ def descriptive_analysis(df: pd.DataFrame) -> dict:
 
 
 # =========================
-# 7) Visualizaciones
+# 6) Visualizaciones
 # =========================
 
 def quick_plots(df: pd.DataFrame):
@@ -252,7 +252,7 @@ def quick_plots(df: pd.DataFrame):
 
 
 # =========================
-# 8) Ejecución
+# 7) Ejecución
 # =========================
 
 def main():

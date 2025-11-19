@@ -31,7 +31,9 @@ ProyectoEdaMarketing/
 │     └─ marketing_merged_clean.csv
 │
 ├─ src/
-│  └─ EDA.py          # Script principal del análisis
+│  └─ EDA.py          # Script del análisis
+│  
+├─ README.md
 
 ## 🧩 Datos
 
@@ -51,31 +53,113 @@ ProyectoEdaMarketing/
 * Se **consolidan** todas las hojas añadiendo `CustomerYearSheet` con el nombre de la hoja.
 * **Unión**: `id_` (CSV) ↔ `ID` (Excel), *left join* .
 
-## 🧹 Limpieza y transformación
 
-En `src/eda_pipeline.py`:
-* Elimina columnas índice accidentales (ej. `Unnamed: 0`).
-* Normaliza categóricas a minúsculas (`job`, `marital`, `education`, `contact`, `poutcome`, `y`).
-* Binarios a `Int64` con NaN permitido (`default`, `housing`, `loan`).
-* Convierte fechas a `datetime` (`date`, `Dt_Customer`).
-* Deriva `contact_year` y `contact_month` **solo** si existe `date`.
-* Convierte numéricas clave con `pd.to_numeric` y **admite columnas extra** (`latitude`, `longitude`, etc.).
-* Une con datos de clientes si `id_` e `ID` existen.
+## 1.📥 Carga de datos
+Se utilizan dos archivos:
 
-## 📊 Análisis descriptivo
+1. bank-additional.csv (datos de campañas telefónicas)
+2. customer-details.xlsx (datos de clientes, dividido en 3 hojas: 2012, 2013 y 2014)
 
-Impresiones en consola:
+El script:
+- carga el CSV con Pandas
+- carga las tres hojas del Excel y las combina en un único DataFrame
+- añade la columna CustomerYearSheet para indicar el año original
+- muestra información de depuración (DEBUG) sobre la columna date, que viene en
+texto y con meses en español:
+Ejemplos:
+2-agosto-2019
+14-septiembre-2016
+29-noviembre-2015
 
-* `shape` (filas x columnas).
-* Top de **valores nulos**.
-* **Balance** de la variable objetivo `y`.
-* **Correlación** entre numéricas (si hay al menos dos).
+## 🧹 2. Limpieza y transformación de datos (en `src/eda_pipeline.py`)
 
-Gráficos generados:
-1. Histograma de **edad**.
-2. Histograma de **duración de llamada**.
-3. **Boxplot** de `age` por `y`.
-4. **Heatmap** de correlación numérica.
+# 2.1 Limpieza del dataset de campañas (clean_bank)
+
+Se realizan las siguientes operaciones:
+
+1. Eliminación de columnas accidentales
+- Se elimina Unnamed: 0 
+
+2. Normalización de texto en columnas categóricas
+- Se convierten a minúsculas, se eliminan espacios y se homogenizan valores.
+
+3. Conversión de columnas binarias
+- Se convierten default, housing y loan a tipo Int64 (permite NaN).
+
+4. Conversión de la columna date
+Como las fechas vienen con el mes en español, se creó una función específica para:
+
+- eliminar acentos
+- separar día, mes y año
+- convertir el mes textual a número
+- generar una fecha válida para Pandas
+
+A partir de la fecha se crean:
+
+- contact_year
+- contact_month
+
+5. Conversión de columnas numéricas
+Columnas que deberían ser numéricas se pasan a pd.to_numeric() con errors='coerce'.
+
+# 2.2 Limpieza del dataset de clientes (clean_customers)
+Se realiza:
+
+- conversión de la columna Dt_Customer a fecha
+- conversión a numérico de Income, Kidhome, Teenhome y NumWebVisitsMonth
+
+## 🔗 3. Integración de datasets (Left Join)
+
+Se realiza una unión LEFT entre:
+
+- bank (tabla principal, columna id_)
+- customers (tabla secundaria, columna ID)
+
+Código:
+bank.merge(customers, left_on='id_',right_on='ID', how='left')
+
+Esto garantiza que:
+- se conservan todas las filas de campañas
+- se añade información del cliente cuando existe
+- si un cliente no está en el Excel, aparece como NaN
+
+
+
+## 🗑 4. Eliminación de columnas casi vacías
+Si una columna tiene ≥98% de nulos, se elimina para mejorar la calidad del análisis.
+Ejemplos eliminados:
+- cons.price.idx
+- euribor3m
+
+
+## 📉 5. Análisis descriptivo
+
+La función descriptive_analysis obtiene:
+
+1. Dimensión del dataset (número de filas y columnas)
+2. Conteo de valores nulos por columna
+3. Estadísticas descriptivas (media, mediana, desviación estándar, etc)
+4. Balance de la variable objetivo y: 
+     Resultados:
+    - ❌ NO contrató  → 88,7%
+    - ✅ SÍ contrató  → 11,3%
+El dataset está claramente desbalanceado.
+
+5. Matriz de correlación entre variables numéricas (si hay al menos 2).
+
+
+## 📊 6. Visualizaiones 
+Se generan gráficas con Matplotlib y Seaborn:
+
+1. Histograma de edad
+2. Histograma de duración de llamadas
+3. Boxplot de edad según respuesta
+4. Heatmap de correlaciones
+
+Las gráficas se muestran con: 
+ptl.show()
+
+Las visualizaciones permiten observar rangos de edad predominantes, sesgos en la duración de llamadas, ausencia de diferencia significativa de edad entre quienes contratan y quienes no, y correlación moderada entre algunas variables económicas.
 
 Principales hallazgos:
 * Edad promedio: alrededor de 40 años.
@@ -83,12 +167,19 @@ Principales hallazgos:
 * Campañas: la mayoría de clientes fueron contactados entre 1 y 3 veces.
 * Tasa de suscripción (y= yes): 11,3%.
 
-## ✅Conclusiones: 
-La edad media y el nivel educativo influyen parcialmente en la respuesta del cliente.
-La duración de la llamada es un factor clave: a mayor tiempo, mayor probabilidad de exito.
-Los clientes casados y con profesión estable tienden a tener una menor tasa de suscripción.
-Los indicadores macroeconómicos muestran variaciones relacionadas con la efectividad de las campañas. 
- 
+El flujo completo se ejecuta mediante el comando:
+python src/EDA.py
+
+
+## ✅ 7. Conclusiones: 
+
+* La campaña tiene una tasa de conversión baja (11,3%)
+* La duración de la llamada es un factor clave. Se mostró una distribución muy sesgada hacia valores bajos, indicando que muchas llamadas fueron breves. Esto puede sugerir baja disponibilidad o o interés inicial de algunos clientes. También indica que a mayor tiempo de llamada, mayor probabilidad de éxito.
+* Las edades de clientes que contratan y no contratan son similares.
+* Los indicadores macroeconómicos muestran variaciones relacionadas con la efectividad de las campañas.
+
+
+
 ## 👤 Autor
 
 Raquel Hernández Santos
