@@ -73,7 +73,7 @@ Ejemplos:
 
 ## 🧹 2. Limpieza y transformación de datos (en `src/eda_pipeline.py`)
 
-## 2.1 Limpieza del dataset de campañas (clean_bank)
+### 2.1 Limpieza del dataset de campañas (clean_bank)
 
 Se realizan las siguientes operaciones:
 
@@ -102,7 +102,7 @@ A partir de la fecha se crean:
 5. Conversión de columnas numéricas
 Columnas que deberían ser numéricas se pasan a pd.to_numeric() con errors='coerce'.
 
-## 2.2 Limpieza del dataset de clientes (clean_customers)
+### 2.2 Limpieza del dataset de clientes (clean_customers)
 Se realiza:
 
 - conversión de la columna Dt_Customer a fecha
