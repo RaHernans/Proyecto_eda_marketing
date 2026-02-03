@@ -94,9 +94,10 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
     df = bank.copy()
 
     # 1 Eliminar columna índice accidental
-    if "Unnamed: 0" in df.columns:
-        df.drop(columns="Unnamed: 0", inplace=True)
-
+    unnamed_cols = [c for c in df.columns if c.lower().startswith("unnamed")]
+    if unnamed_cols:
+        df.drop(columns=unnamed_cols, inplace=True)
+  
     # 2 Normalizar texto en categóricas
     for c in ['job', 'marital', 'education', 'contact', 'poutcome', 'y']:
         if c in df.columns and df[c].dtype == 'object':
@@ -110,14 +111,9 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
     # 4 Manejo robusto de 'date' (meses en español, sin warnings)
     if 'date' in df.columns:
         raw = df['date']
-
-        # Ignorar UserWarning solo dentro de este bloque
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-
             parsed = parse_spanish_month_dates(raw)
-
-            # Si aún queda poco parseado, probar formatos numéricos habituales
             if parsed.notna().mean() < 0.90:
                 candidates = ["%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"]
                 best = parsed
@@ -128,8 +124,6 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
                 parsed = best
 
         df['date'] = parsed
-
-        # Se deriva solo si hay fechas válidas
         if df['date'].notna().sum() > 0:
             df['contact_year'] = df['date'].dt.year
             df['contact_month'] = df['date'].dt.month
@@ -137,7 +131,6 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
             for c in ('contact_year', 'contact_month'):
                 if c in df.columns:
                     df.drop(columns=c, inplace=True)
-
 
 
     # 5 Asegurar numéricos (si existen)
@@ -158,6 +151,10 @@ def clean_bank(bank: pd.DataFrame) -> pd.DataFrame:
 def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
     df = customers.copy()
 
+  # Eliminar posibles columnas índice tipo 'Unnamed: 0'
+    unnamed_cols = [c for c in df.columns if c.lower().startswith("unnamed")]
+    if unnamed_cols:
+        df.drop(columns=unnamed_cols, inplace=True)
     if 'Dt_Customer' in df.columns:
         df['Dt_Customer'] = pd.to_datetime(df['Dt_Customer'], errors='coerce')
 
@@ -178,6 +175,12 @@ def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
         merged = bank.merge(customers, left_on='id_', right_on='ID', how='left')
     else:
         merged = bank.copy()
+
+ # Limpieza final de columnas 'Unnamed' que puedan venir del Excel
+    unnamed_cols = [c for c in merged.columns if c.lower().startswith("unnamed")]
+    if unnamed_cols:
+        merged = merged.drop(columns=unnamed_cols)       
+   
     return merged
 
 
@@ -185,13 +188,21 @@ def merge_data(bank: pd.DataFrame, customers: pd.DataFrame) -> pd.DataFrame:
 # 4) Eliminar columnas casi vacías
 # =========================
 
-def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.98) -> pd.DataFrame:
     to_drop = [c for c in df.columns if df[c].isna().mean() >= thresh]
     if to_drop:
         print(f"⚠️ Eliminando columnas casi vacías (≥{int(thresh*100)}% nulos): {to_drop}")
         df = df.drop(columns=to_drop)
     return df
-
+def drop_mostly_nulls(df: pd.DataFrame, thresh: float = 0.9) -> pd.DataFrame:
+    """
+    Elimina columnas con un porcentaje de nulos mayor o igual al umbral.
+    Por defecto, si una columna tiene ≥90% de nulos, se elimina.
+    """
+    to_drop = [c for c in df.columns if df[c].isna().mean() >= thresh]
+    if to_drop:
+        print(f"⚠️ Eliminando columnas casi vacías (≥{int(thresh*100)}% nulos): {to_drop}")
+        df = df.drop(columns=to_drop)
+    return df
 
 # =========================
 # 5) Análisis descriptivo
@@ -272,7 +283,7 @@ def main():
     df = merge_data(bank, customers)
 
     # Eliminar columnas casi vacías 
-    df = drop_mostly_nulls(df, thresh=0.98)
+    df = drop_mostly_nulls(df, thresh=0.9)
 
     # Guardar limpio
     output = "data/processed/marketing_merged_clean.csv"

@@ -2,7 +2,7 @@
 
 Este repositorio contiene un análisis exploratorio de datos (EDA) sobre campañas de *marketing directo* de una entidad bancaria portuguesa. Las campañas consisten en llamadas telefónicas para promover un **depósito a plazo** y la variable objetivo `y` indica si el cliente suscribió el producto (yes/no).
 
-## 🎯 Objetivo
+## Objetivo
 
 Realizar un **análisis exploratorio general** para:
 - Entender el perfil de los clientes y las campañas.
@@ -10,18 +10,18 @@ Realizar un **análisis exploratorio general** para:
 - Dejar preparado un dataset limpio para análisis posteriores.
 
 > **Nota sobre el dataset real**  
-> El fichero `bank-additional.csv` no incluye las columnas `contact_month` y `contact_year` (mencionadas en el enunciado).  
+> El fichero `bank-additional.csv` no incluye las columnas `contact_month` y `contact_year` (mencionadas en el enunciado original).  
 > En cambio, trae columnas extra como `latitude` y `longitude`.  
 > El pipeline se **adapta automáticamente**: si existe `date`, deriva `contact_year` y `contact_month`; si no existe, omite esa parte.  
 > También se incorporan las columnas extra numéricas (como lat/long) cuando están presentes.
 
-## 🧰 Herramientas
+## Herramientas
 
 - **Lenguaje:** Python  
 - **Entorno:** Visual Studio Code  
 - **Librerías:** `pandas`, `matplotlib`, `seaborn`
 
-## 📁 Estructura del repositorio
+## Estructura del repositorio
 ProyectoEdaMarketing/
 ├─ data/
 │  ├─ raw/                     # Datos originales
@@ -35,7 +35,7 @@ ProyectoEdaMarketing/
 │  
 ├─ README.md
 
-## 🧩 Datos
+## Datos
 
 ### `bank-additional.csv`
 
@@ -54,7 +54,7 @@ ProyectoEdaMarketing/
 * **Unión**: `id_` (CSV) ↔ `ID` (Excel), *left join* .
 
 
-## 1.📥 Carga de datos
+## 1.Carga de datos
 Se utilizan dos archivos:
 
 1. bank-additional.csv (datos de campañas telefónicas)
@@ -71,14 +71,14 @@ Ejemplos:
 14-septiembre-2016
 29-noviembre-2015
 
-## 🧹 2. Limpieza y transformación de datos (en `src/eda_pipeline.py`)
+## 2. Limpieza y transformación de datos (en `src/eda_pipeline.py`)
 
 ### 2.1 Limpieza del dataset de campañas (clean_bank)
 
 Se realizan las siguientes operaciones:
 
 1. Eliminación de columnas accidentales
-- Se elimina Unnamed: 0 
+- Se eliminan automáticamente columnas tipo Unnamed: 0 o similares.
 
 2. Normalización de texto en columnas categóricas
 - Se convierten a minúsculas, se eliminan espacios y se homogenizan valores.
@@ -88,14 +88,11 @@ Se realizan las siguientes operaciones:
 
 4. Conversión de la columna date
 Como las fechas vienen con el mes en español, se creó una función específica para:
-
 - eliminar acentos
 - separar día, mes y año
 - convertir el mes textual a número
 - generar una fecha válida para Pandas
-
 A partir de la fecha se crean:
-
 - contact_year
 - contact_month
 
@@ -104,11 +101,11 @@ Columnas que deberían ser numéricas se pasan a pd.to_numeric() con errors='coe
 
 ### 2.2 Limpieza del dataset de clientes (clean_customers)
 Se realiza:
-
 - conversión de la columna Dt_Customer a fecha
 - conversión a numérico de Income, Kidhome, Teenhome y NumWebVisitsMonth
+- Eliminación de posibles columnas residuales tipo Unnamed.
 
-## 🔗 3. Integración de datasets (Left Join)
+## 3. Integración de datasets (Left Join)
 
 Se realiza una unión LEFT entre:
 
@@ -125,14 +122,14 @@ Esto garantiza que:
 
 
 
-## 🗑 4. Eliminación de columnas casi vacías
-Si una columna tiene ≥98% de nulos, se elimina para mejorar la calidad del análisis.
+## 4. Eliminación de columnas con muchos nulos.
+Si una columna tiene un porcentaje de valores nulos ≥90%, se elimina para mejorar la calidad del análisis.
 Ejemplos eliminados:
 - cons.price.idx
 - euribor3m
 
 
-## 📉 5. Análisis descriptivo
+## 5. Análisis descriptivo
 
 La función descriptive_analysis obtiene:
 
@@ -141,14 +138,14 @@ La función descriptive_analysis obtiene:
 3. Estadísticas descriptivas (media, mediana, desviación estándar, etc)
 4. Balance de la variable objetivo y: 
      Resultados:
-    - ❌ NO contrató  → 88,7%
-    - ✅ SÍ contrató  → 11,3%
+    - NO contrató  → 88,7%
+    - SÍ contrató  → 11,3%
 El dataset está claramente desbalanceado.
 
 5. Matriz de correlación entre variables numéricas (si hay al menos 2).
 
 
-## 📊 6. Visualizaiones 
+## 6. Visualizaiones 
 Se generan gráficas con Matplotlib y Seaborn:
 
 1. Histograma de edad
@@ -161,7 +158,7 @@ ptl.show()
 
 Las visualizaciones permiten observar rangos de edad predominantes, sesgos en la duración de llamadas, ausencia de diferencia significativa de edad entre quienes contratan y quienes no, y correlación moderada entre algunas variables económicas.
 
-Principales hallazgos:
+Principales insights:
 * Edad promedio: alrededor de 40 años.
 * Duración media de las llamadas: 250 segundos
 * Campañas: la mayoría de clientes fueron contactados entre 1 y 3 veces.
@@ -171,10 +168,10 @@ El flujo completo se ejecuta mediante el comando:
 python src/EDA.py
 
 
-## ✅ 7. Conclusiones: 
+## 7. Conclusiones: 
 
 * La campaña tiene una tasa de conversión baja (11,3%)
-* La duración de la llamada es un factor clave. Se mostró una distribución muy sesgada hacia valores bajos, indicando que muchas llamadas fueron breves. Esto puede sugerir baja disponibilidad o o interés inicial de algunos clientes. También indica que a mayor tiempo de llamada, mayor probabilidad de éxito.
+* La duración de la llamada es un factor clave. Se mostró una distribución muy sesgada hacia valores bajos, indicando que muchas llamadas fueron breves. Esto puede sugerir baja disponibilidad o interés inicial de algunos clientes. También indica que a mayor tiempo de llamada, mayor probabilidad de éxito.
 * Las edades de clientes que contratan y no contratan son similares.
 * Los indicadores macroeconómicos muestran variaciones relacionadas con la efectividad de las campañas.
 
