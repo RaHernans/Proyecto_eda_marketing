@@ -227,8 +227,17 @@ def descriptive_analysis(df: pd.DataFrame) -> dict:
 # 6) Visualizaciones
 # =========================
 
+
 def quick_plots(df: pd.DataFrame):
-    # Histograma de edad
+    from pathlib import Path
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    FIGURES_DIR = BASE_DIR / "reports" / "figures"
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
+ # 1. Histograma de edad
     if 'age' in df.columns:
         plt.figure()
         plt.hist(df['age'].dropna(), bins=30)
@@ -236,8 +245,10 @@ def quick_plots(df: pd.DataFrame):
         plt.xlabel("Edad")
         plt.ylabel("Frecuencia")
         plt.tight_layout()
+        plt.savefig(FIGURES_DIR / "hist_edad.png", dpi=150)
+        plt.close()
 
-    # Histograma de duración de llamadas
+    # 2. Histograma de duración
     if 'duration' in df.columns:
         plt.figure()
         plt.hist(df['duration'].dropna(), bins=30)
@@ -245,21 +256,29 @@ def quick_plots(df: pd.DataFrame):
         plt.xlabel("Segundos")
         plt.ylabel("Frecuencia")
         plt.tight_layout()
+        plt.savefig(FIGURES_DIR / "hist_duration.png", dpi=150)
+        plt.close()
 
-    # Boxplot de edad por suscripción
+    # 3. Boxplot edad vs y
     if 'y' in df.columns and 'age' in df.columns:
         plt.figure()
         sns.boxplot(x='y', y='age', data=df)
-        plt.title("Edad según suscripción (y)")
+        plt.title("Edad según suscripción")
         plt.tight_layout()
+        plt.savefig(FIGURES_DIR / "boxplot_age_y.png", dpi=150)
+        plt.close()
 
-    # Heatmap de correlaciones
+    # 4. Heatmap correlaciones
     num_df = df.select_dtypes(include=['number'])
     if num_df.shape[1] >= 2:
         plt.figure(figsize=(9, 7))
         sns.heatmap(num_df.corr(numeric_only=True), cmap="coolwarm", annot=False)
-        plt.title("Matriz de correlación (variables numéricas)")
+        plt.title("Matriz de correlación")
         plt.tight_layout()
+        plt.savefig(FIGURES_DIR / "heatmap_corr.png", dpi=150)
+        plt.close()
+
+
 
 
 # =========================

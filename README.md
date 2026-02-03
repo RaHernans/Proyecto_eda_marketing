@@ -71,7 +71,7 @@ Ejemplos:
 14-septiembre-2016
 29-noviembre-2015
 
-## 2. Limpieza y transformación de datos (en `src/eda_pipeline.py`)
+## 2. Limpieza y transformación de datos (en `src/EDA.py`)
 
 ### 2.1 Limpieza del dataset de campañas (clean_bank)
 
@@ -153,8 +153,10 @@ Se generan gráficas con Matplotlib y Seaborn:
 3. Boxplot de edad según respuesta
 4. Heatmap de correlaciones
 
-Las gráficas se muestran con: 
-ptl.show()
+Las principales visualizaciones generadas durante el EDA se guardan automáticamente en: 
+reports/figures/
+Incluyen las gráficas antes mencionadas que apoyan los insights descritos en este análisis.
+
 
 Las visualizaciones permiten observar rangos de edad predominantes, sesgos en la duración de llamadas, ausencia de diferencia significativa de edad entre quienes contratan y quienes no, y correlación moderada entre algunas variables económicas.
 
